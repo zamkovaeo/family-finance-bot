@@ -1,0 +1,36 @@
+from datetime import date
+from decimal import Decimal
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+from app.models.enums import TransactionType
+
+
+class OperationCreate(BaseModel):
+    telegram_id: int
+    text: str
+    default_type: TransactionType = TransactionType.expense
+
+
+class BudgetCreate(BaseModel):
+    telegram_id: int
+    category: str
+    amount: Decimal = Field(gt=0)
+
+
+class GoalCreate(BaseModel):
+    telegram_id: int
+    title: str
+    target_amount: Decimal = Field(gt=0)
+    due_date: date | None = None
+
+
+class TransactionOut(BaseModel):
+    id: UUID
+    amount: Decimal
+    type: TransactionType
+    comment: str | None
+    is_personal: bool
+    category: str
+    tag: str | None
