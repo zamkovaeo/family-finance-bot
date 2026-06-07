@@ -2,7 +2,7 @@ services:
   - type: web
     name: family-finance-bot
     env: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
@@ -27,4 +27,4 @@ services:
 
 databases:
   - name: family-finance-db
-    plan: starter
+    plan: free
