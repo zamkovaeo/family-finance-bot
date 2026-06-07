@@ -18,12 +18,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    user_role = sa.Enum("admin", "member", name="userrole")
-    category_kind = sa.Enum("income", "expense", name="categorykind")
-    transaction_type = sa.Enum("income", "expense", name="transactiontype")
-    user_role.create(op.get_bind(), checkfirst=True)
-    category_kind.create(op.get_bind(), checkfirst=True)
-    transaction_type.create(op.get_bind(), checkfirst=True)
+    op.execute("DO $$ BEGIN CREATE TYPE userrole AS ENUM ('admin', 'member'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE categorykind AS ENUM ('income', 'expense'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE transactiontype AS ENUM ('income', 'expense'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+    user_role = postgresql.ENUM("admin", "member", name="userrole", create_type=False)
+    category_kind = postgresql.ENUM("income", "expense", name="categorykind", create_type=False)
+    transaction_type = postgresql.ENUM("income", "expense", name="transactiontype", create_type=False)
 
     op.create_table(
         "families",
