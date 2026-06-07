@@ -25,9 +25,11 @@ class Categorizer:
         text_lower = text.lower()
         selected_name = "Прочее"
 
-        for name, _emoji, keywords in category_defaults(kind):
+        selected_emoji = "📦" if kind == CategoryKind.expense else "💰"
+        for name, emoji, keywords in category_defaults(kind):
             if any(keyword in text_lower for keyword in keywords):
                 selected_name = name
+                selected_emoji = emoji
                 break
 
         category = await session.scalar(
@@ -39,6 +41,17 @@ class Categorizer:
         )
         if category:
             return category
+
+        category = Category(
+            family_id=family_id,
+            name=selected_name,
+            kind=kind,
+            emoji=selected_emoji,
+            is_default=True,
+        )
+        session.add(category)
+        await session.flush()
+        return category
 
         fallback = await session.scalar(
             select(Category).where(
@@ -65,4 +78,3 @@ async def transcribe_voice(file_bytes: bytes, filename: str = "voice.ogg") -> st
         language="ru",
     )
     return result.text
-
