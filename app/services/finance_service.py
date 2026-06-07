@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.entities import Budget, Category, Goal, Tag, Transaction, User
 from app.models.enums import CategoryKind, TransactionType
+from app.services.defaults import category_defaults
 from app.services.llm_service import Categorizer
 from app.services.parser import ParsedOperation, parse_operation
 
@@ -15,6 +16,13 @@ from app.services.parser import ParsedOperation, parse_operation
 def month_start(dt: datetime | None = None) -> datetime:
     current = dt or datetime.now(timezone.utc)
     return datetime(current.year, current.month, 1, tzinfo=timezone.utc)
+
+
+def previous_month_start(dt: datetime | None = None) -> datetime:
+    current = month_start(dt)
+    if current.month == 1:
+        return datetime(current.year - 1, 12, 1, tzinfo=timezone.utc)
+    return datetime(current.year, current.month - 1, 1, tzinfo=timezone.utc)
 
 
 class FinanceService:
@@ -65,6 +73,7 @@ class FinanceService:
         family_id,
         category_name: str,
         amount: Decimal,
+        month: datetime | None = None,
     ) -> Budget:
         category = await session.scalar(
             select(Category).where(
@@ -74,12 +83,20 @@ class FinanceService:
             )
         )
         if not category:
-            raise ValueError("Категория не найдена. Проверьте название.")
+            category = Category(
+                family_id=family_id,
+                name=category_name,
+                kind=CategoryKind.expense,
+                emoji=self.category_emoji(category_name),
+                is_default=True,
+            )
+            session.add(category)
+            await session.flush()
 
         stmt = insert(Budget).values(
             family_id=family_id,
             category_id=category.id,
-            month=month_start(),
+            month=month_start(month),
             limit_amount=amount,
             notified_80=False,
             notified_100=False,
@@ -92,6 +109,34 @@ class FinanceService:
         budget = (await session.execute(stmt)).scalar_one()
         await session.commit()
         return budget
+
+    async def set_budget_plan(
+        self,
+        session: AsyncSession,
+        family_id,
+        month: datetime,
+        items: list[tuple[str, Decimal]],
+    ) -> list[Budget]:
+        budgets = []
+        for category_name, amount in items:
+            budget = await self.set_budget(session, family_id, category_name, amount, month)
+            budgets.append(budget)
+        return budgets
+
+    async def budget_template_values(self, session: AsyncSession, family_id, month: datetime) -> dict[str, Decimal]:
+        previous_month = previous_month_start(month)
+        stmt = (
+            select(Category.name, Budget.limit_amount)
+            .join(Category, Category.id == Budget.category_id)
+            .where(Budget.family_id == family_id, Budget.month == previous_month)
+        )
+        return {name: Decimal(amount) for name, amount in (await session.execute(stmt)).all()}
+
+    def category_emoji(self, category_name: str) -> str:
+        for name, emoji, _keywords in category_defaults(CategoryKind.expense):
+            if name.lower() == category_name.lower():
+                return emoji
+        return "📦"
 
     async def budget_rows(self, session: AsyncSession, family_id, user_id=None, personal_only: bool = False) -> list[dict]:
         start = month_start()
