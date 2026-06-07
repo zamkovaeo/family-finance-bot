@@ -1,10 +1,12 @@
+import re
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import BufferedInputFile, Message
+from aiogram.types import BufferedInputFile, KeyboardButton, Message, ReplyKeyboardMarkup
 from sqlalchemy import select
 
 from app.bot.keyboards import analytics_menu, goals_menu, main_menu, settings_menu
@@ -16,6 +18,7 @@ from app.services.family_service import ensure_user
 from app.services.finance_service import FinanceService
 from app.services.llm_service import transcribe_voice
 from app.services.reporting_service import ReportingService
+from app.services.defaults import EXPENSE_CATEGORIES
 from app.utils.formatting import money, percent_text, progress_bar
 
 router = Router()
@@ -28,6 +31,7 @@ class InputState(StatesGroup):
     expense = State()
     income = State()
     budget = State()
+    budget_confirm = State()
     goal_create = State()
     goal_progress = State()
 
@@ -235,22 +239,155 @@ async def invite_code(message: Message) -> None:
 
 @router.message(F.text == "Задать лимит")
 async def ask_budget(message: Message, state: FSMContext) -> None:
+    user = await current_user(message)
+    target_month = next_month_start()
+    async with SessionLocal() as session:
+        previous_values = await finance.budget_template_values(session, user.family_id, target_month)
     await state.set_state(InputState.budget)
-    await message.answer("Введите лимит на месяц: Продукты 60000")
+    await message.answer(
+        build_budget_template(target_month, previous_values),
+        reply_markup=settings_menu(),
+    )
 
 
 @router.message(InputState.budget)
 async def set_budget(message: Message, state: FSMContext) -> None:
-    user = await current_user(message)
     try:
-        category, amount = split_title_amount(message.text)
-        async with SessionLocal() as session:
-            await finance.set_budget(session, user.family_id, category, amount)
-        await message.answer(f"Лимит задан: {category} — {money(amount)}", reply_markup=settings_menu())
+        target_month, items = parse_budget_plan(message.text)
     except ValueError as exc:
         await message.answer(str(exc))
         return
+    total = sum((amount for _category, amount in items), Decimal(0))
+    await state.update_data(
+        budget_month=target_month.isoformat(),
+        budget_items=[(category, str(amount)) for category, amount in items],
+    )
+    await state.set_state(InputState.budget_confirm)
+    categories = "\n".join(f"• {category}: {money(amount)}" for category, amount in items)
+    await message.answer(
+        f"Проверьте план на {target_month:%m.%Y}\n\n"
+        f"{categories}\n\n"
+        f"Итого лимитов на месяц: {money(total)}\n\n"
+        "Сохранить эти лимиты?",
+        reply_markup=budget_confirm_menu(),
+    )
+
+
+@router.message(InputState.budget_confirm, F.text == "✅ Сохранить лимиты")
+async def confirm_budget_plan(message: Message, state: FSMContext) -> None:
+    user = await current_user(message)
+    data = await state.get_data()
+    target_month = datetime.fromisoformat(data["budget_month"])
+    items = [(category, Decimal(amount)) for category, amount in data["budget_items"]]
+    async with SessionLocal() as session:
+        await finance.set_budget_plan(session, user.family_id, target_month, items)
+    total = sum((amount for _category, amount in items), Decimal(0))
     await state.clear()
+    await message.answer(
+        f"Лимиты сохранены на {target_month:%m.%Y}\n\n"
+        f"Категорий: {len(items)}\n"
+        f"Общий план: {money(total)}",
+        reply_markup=settings_menu(),
+    )
+
+
+@router.message(InputState.budget_confirm)
+async def cancel_or_reenter_budget_plan(message: Message, state: FSMContext) -> None:
+    if message.text == "↩️ Изменить план":
+        await state.set_state(InputState.budget)
+        await message.answer("Пришлите исправленный план лимитов.", reply_markup=settings_menu())
+        return
+    await state.clear()
+    await message.answer("Ок, лимиты не сохранены.", reply_markup=settings_menu())
+
+
+def budget_confirm_menu() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="✅ Сохранить лимиты")],
+            [KeyboardButton(text="↩️ Изменить план"), KeyboardButton(text="⬅️ Главное меню")],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def next_month_start() -> datetime:
+    now = datetime.now(timezone.utc)
+    if now.month == 12:
+        return datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+    return datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+
+
+def build_budget_template(target_month: datetime, previous_values: dict[str, Decimal]) -> str:
+    lines = [
+        "Введите лимит на месяц:",
+        "",
+        "📅 План личного бюджета",
+        f"Месяц: {target_month:%m.%Y}",
+        "",
+    ]
+    for name, emoji, _keywords in EXPENSE_CATEGORIES:
+        if name == "Прочее":
+            continue
+        amount = previous_values.get(name)
+        value = money(amount).replace(" ₽", "") if amount else ""
+        lines.append(f"{emoji} {name} — {value}")
+        if name in {"Кредиты", "Транспорт", "Одежда и техника"}:
+            lines.append("")
+    lines.append("")
+    lines.append("Заполните суммы и отправьте этот план обратно.")
+    return "\n".join(lines)
+
+
+def parse_budget_plan(text: str) -> tuple[datetime, list[tuple[str, Decimal]]]:
+    month = None
+    items: list[tuple[str, Decimal]] = []
+    category_names = {name.lower(): name for name, _emoji, _keywords in EXPENSE_CATEGORIES}
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        month_match = re.search(r"месяц\s*:\s*(?P<month>\d{1,2})[.\/-](?P<year>\d{2,4})", line, flags=re.I)
+        if month_match:
+            month_value = int(month_match.group("month"))
+            year_value = int(month_match.group("year"))
+            if year_value < 100:
+                year_value += 2000
+            try:
+                month = datetime(year_value, month_value, 1, tzinfo=timezone.utc)
+            except ValueError as exc:
+                raise ValueError("Месяц выглядит некорректно. Пример: Месяц: 07.2026") from exc
+            continue
+
+        if "—" not in line and "-" not in line:
+            continue
+        category_part, amount_part = re.split(r"\s+[—-]\s*", line, maxsplit=1)
+        category = clean_category_name(category_part)
+        canonical = category_names.get(category.lower())
+        if not canonical:
+            continue
+        amount_text = amount_part.replace("₽", "").replace("руб", "").replace(" ", "").replace(",", ".").strip()
+        if not amount_text:
+            continue
+        try:
+            amount = Decimal(amount_text)
+        except Exception as exc:
+            raise ValueError(f"Не смог прочитать сумму для категории «{canonical}».") from exc
+        if amount < 0:
+            raise ValueError(f"Сумма для категории «{canonical}» не может быть отрицательной.")
+        items.append((canonical, amount))
+
+    if not month:
+        raise ValueError("Укажите месяц планирования строкой: Месяц: 07.2026")
+    if not items:
+        raise ValueError("Не нашел заполненных категорий. Оставьте строки вида: Продукты — 60000")
+    return month, items
+
+
+def clean_category_name(value: str) -> str:
+    value = re.sub(r"^[^\wа-яА-ЯёЁ]+", "", value, flags=re.I)
+    return " ".join(value.split())
 
 
 @router.message(F.voice)
