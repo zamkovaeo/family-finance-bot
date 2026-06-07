@@ -42,6 +42,7 @@ class FinanceService:
         tag = await self._get_or_create_tag(session, user.family_id, parsed.tag)
 
         tx = Transaction(
+            date=parsed.date or datetime.now(timezone.utc),
             amount=parsed.amount,
             type=parsed.type,
             user_id=user.id,
@@ -53,7 +54,7 @@ class FinanceService:
         )
         session.add(tx)
         await session.flush()
-        alerts = await self.check_limit_alerts(session, user.family_id, category.id)
+        alerts = await self.check_limit_alerts(session, user.family_id, category.id, tx.date)
         await session.commit()
         await session.refresh(tx, attribute_names=["category", "tag"])
         return tx, alerts
@@ -150,11 +151,14 @@ class FinanceService:
             "balance": values[TransactionType.income] - values[TransactionType.expense],
         }
 
-    async def check_limit_alerts(self, session: AsyncSession, family_id, category_id) -> list[str]:
+    async def check_limit_alerts(self, session: AsyncSession, family_id, category_id, operation_date: datetime | None = None) -> list[str]:
+        operation_month = month_start(operation_date)
+        if operation_month != month_start():
+            return []
         budget = await session.scalar(
             select(Budget)
             .options(selectinload(Budget.category))
-            .where(Budget.family_id == family_id, Budget.category_id == category_id, Budget.month == month_start())
+            .where(Budget.family_id == family_id, Budget.category_id == category_id, Budget.month == operation_month)
         )
         if not budget:
             return []
@@ -164,8 +168,8 @@ class FinanceService:
                 Transaction.family_id == family_id,
                 Transaction.category_id == category_id,
                 Transaction.type == TransactionType.expense,
-                extract("year", Transaction.date) == month_start().year,
-                extract("month", Transaction.date) == month_start().month,
+                extract("year", Transaction.date) == operation_month.year,
+                extract("month", Transaction.date) == operation_month.month,
             )
         )
         spent = Decimal(spent)
