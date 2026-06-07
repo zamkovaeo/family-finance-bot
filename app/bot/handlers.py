@@ -54,7 +54,7 @@ async def start(message: Message, command: CommandObject) -> None:
         "Готов вести семейный бюджет.\n\n"
         f"Ваша роль: {role_text}\n"
         f"Код приглашения семьи: {family.invite_code}\n\n"
-        "Можно писать сразу: Кофе 350 #отпуск личное",
+        "Можно писать сразу: Кофе 350 #отпуск личное 07.06.2026",
         reply_markup=main_menu(),
     )
 
@@ -69,14 +69,14 @@ async def back_to_menu(message: Message, state: FSMContext) -> None:
 async def ask_expense(message: Message, state: FSMContext) -> None:
     await current_user(message)
     await state.set_state(InputState.expense)
-    await message.answer("Введите расход: Кофе 350 #отпуск личное")
+    await message.answer("Введите расход: Кофе 350 #отпуск личное 07.06.2026")
 
 
 @router.message(F.text == "💰 Доход")
 async def ask_income(message: Message, state: FSMContext) -> None:
     await current_user(message)
     await state.set_state(InputState.income)
-    await message.answer("Введите доход: Зарплата 180000")
+    await message.answer("Введите доход: Зарплата 180000 01.06.2026")
 
 
 @router.message(InputState.expense)
@@ -296,7 +296,8 @@ async def add_operation(
     await message.answer(
         f"{sign} сохранен\n\n"
         f"{tx.category.emoji} {tx.category.name}: {money(tx.amount)}\n"
-        f"{tx.comment} · {scope}{tag}",
+        f"{tx.comment} · {scope}{tag}\n"
+        f"Дата: {tx.date:%d.%m.%Y}",
         reply_markup=main_menu(),
     )
     for alert in alerts:
