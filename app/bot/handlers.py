@@ -6,7 +6,7 @@ from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import BufferedInputFile, KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Message, ReplyKeyboardMarkup, WebAppInfo
 from sqlalchemy import select
 
 from app.bot.keyboards import analytics_menu, goals_menu, main_menu, settings_menu
@@ -20,6 +20,7 @@ from app.services.llm_service import transcribe_voice
 from app.services.reporting_service import ReportingService
 from app.services.defaults import EXPENSE_CATEGORIES
 from app.utils.formatting import money, percent_text, progress_bar
+from app.core.config import settings
 
 router = Router()
 finance = FinanceService()
@@ -58,9 +59,24 @@ async def start(message: Message, command: CommandObject) -> None:
         "Готов вести семейный бюджет.\n\n"
         f"Ваша роль: {role_text}\n"
         f"Код приглашения семьи: {family.invite_code}\n\n"
-        "Можно писать сразу: Кофе 350 #отпуск личное 07.06.2026",
+        "Можно писать сразу: Кофе 350 #отпуск личное 07.06.2026\n"
+        "Или откройте Mini App для удобного учета.",
         reply_markup=main_menu(),
     )
+    if settings.public_app_url:
+        await message.answer(
+            "Открыть финансовое приложение",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="Открыть Mini App",
+                            web_app=WebAppInfo(url=settings.public_app_url),
+                        )
+                    ]
+                ]
+            ),
+        )
 
 
 @router.message(F.text == "⬅️ Главное меню")
