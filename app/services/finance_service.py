@@ -67,6 +67,40 @@ class FinanceService:
         await session.refresh(tx, attribute_names=["category", "tag"])
         return tx, alerts
 
+    async def add_manual_transaction(
+        self,
+        session: AsyncSession,
+        user: User,
+        amount: Decimal,
+        tx_type: TransactionType,
+        category_name: str,
+        operation_date: datetime,
+        comment: str | None = None,
+        tag_name: str | None = None,
+        is_personal: bool = False,
+    ) -> tuple[Transaction, list[str]]:
+        kind = CategoryKind.expense if tx_type == TransactionType.expense else CategoryKind.income
+        category = await self._get_or_create_category(session, user.family_id, category_name, kind)
+        tag = await self._get_or_create_tag(session, user.family_id, tag_name)
+
+        tx = Transaction(
+            date=operation_date,
+            amount=amount,
+            type=tx_type,
+            user_id=user.id,
+            family_id=user.family_id,
+            category_id=category.id,
+            tag_id=tag.id if tag else None,
+            comment=comment or category_name,
+            is_personal=is_personal,
+        )
+        session.add(tx)
+        await session.flush()
+        alerts = await self.check_limit_alerts(session, user.family_id, category.id, tx.date)
+        await session.commit()
+        await session.refresh(tx, attribute_names=["category", "tag"])
+        return tx, alerts
+
     async def set_budget(
         self,
         session: AsyncSession,
@@ -270,3 +304,30 @@ class FinanceService:
         session.add(tag)
         await session.flush()
         return tag
+
+    async def _get_or_create_category(
+        self,
+        session: AsyncSession,
+        family_id,
+        category_name: str,
+        kind: CategoryKind,
+    ) -> Category:
+        category = await session.scalar(
+            select(Category).where(
+                Category.family_id == family_id,
+                Category.kind == kind,
+                func.lower(Category.name) == category_name.lower(),
+            )
+        )
+        if category:
+            return category
+        category = Category(
+            family_id=family_id,
+            name=category_name,
+            kind=kind,
+            emoji=self.category_emoji(category_name) if kind == CategoryKind.expense else "💰",
+            is_default=True,
+        )
+        session.add(category)
+        await session.flush()
+        return category
