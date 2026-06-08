@@ -1,11 +1,22 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.models.entities import User
-from app.models.enums import TransactionType
-from app.schemas.finance import BudgetCreate, GoalCreate, OperationCreate
+from app.models.entities import Category, User
+from app.models.enums import CategoryKind, TransactionType
+from app.schemas.finance import (
+    BudgetCreate,
+    BudgetPlanCreate,
+    GoalCreate,
+    ManualTransactionCreate,
+    MiniAppBootstrap,
+    OperationCreate,
+)
+from app.services.defaults import EXPENSE_CATEGORIES, INCOME_CATEGORIES
+from app.services.family_service import ensure_user
 from app.services.analytics_service import AnalyticsService
 from app.services.finance_service import FinanceService
 from app.services.reporting_service import ReportingService
@@ -22,6 +33,91 @@ async def user_by_telegram_id(session: AsyncSession, telegram_id: int) -> User:
     if not user:
         raise HTTPException(status_code=404, detail="User is not registered in Telegram bot")
     return user
+
+
+@router.post("/miniapp/bootstrap")
+async def miniapp_bootstrap(payload: MiniAppBootstrap, session: AsyncSession = Depends(get_session)) -> dict:
+    user = await ensure_user(
+        session,
+        telegram_id=payload.telegram_id,
+        username=payload.username,
+        first_name=payload.first_name,
+        invite_code=payload.invite_code,
+    )
+    return {"telegram_id": user.telegram_id, "family_id": str(user.family_id), "role": user.role.value}
+
+
+@router.get("/miniapp/categories/{telegram_id}")
+async def miniapp_categories(telegram_id: int, session: AsyncSession = Depends(get_session)) -> dict:
+    user = await user_by_telegram_id(session, telegram_id)
+    existing = list((await session.scalars(select(Category).where(Category.family_id == user.family_id))).all())
+    by_kind = {
+        CategoryKind.expense: [{"name": name, "emoji": emoji} for name, emoji, _ in EXPENSE_CATEGORIES],
+        CategoryKind.income: [{"name": name, "emoji": emoji} for name, emoji, _ in INCOME_CATEGORIES],
+    }
+    for category in existing:
+        if not any(item["name"].lower() == category.name.lower() for item in by_kind[category.kind]):
+            by_kind[category.kind].append({"name": category.name, "emoji": category.emoji})
+    return {"expense": by_kind[CategoryKind.expense], "income": by_kind[CategoryKind.income]}
+
+
+@router.post("/miniapp/transactions")
+async def miniapp_add_transaction(
+    payload: ManualTransactionCreate,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    user = await user_by_telegram_id(session, payload.telegram_id)
+    tx, alerts = await finance.add_manual_transaction(
+        session=session,
+        user=user,
+        amount=payload.amount,
+        tx_type=payload.type,
+        category_name=payload.category,
+        operation_date=payload.date,
+        comment=payload.comment,
+        tag_name=payload.tag,
+        is_personal=payload.is_personal,
+    )
+    return {
+        "id": str(tx.id),
+        "amount": str(tx.amount),
+        "type": tx.type.value,
+        "category": tx.category.name,
+        "date": tx.date.isoformat(),
+        "alerts": alerts,
+    }
+
+
+@router.get("/miniapp/budget-template/{telegram_id}")
+async def miniapp_budget_template(
+    telegram_id: int,
+    month: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    user = await user_by_telegram_id(session, telegram_id)
+    try:
+        target_month = datetime.fromisoformat(f"{month}-01")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Month must be YYYY-MM") from exc
+    values = await finance.budget_template_values(session, user.family_id, target_month)
+    items = []
+    for name, emoji, _keywords in EXPENSE_CATEGORIES:
+        if name == "Прочее":
+            continue
+        items.append({"category": name, "emoji": emoji, "amount": str(values.get(name, 0))})
+    return {"month": month, "items": items}
+
+
+@router.post("/miniapp/budget-plan")
+async def miniapp_save_budget_plan(
+    payload: BudgetPlanCreate,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    user = await user_by_telegram_id(session, payload.telegram_id)
+    items = [(item.category, item.amount) for item in payload.items]
+    await finance.set_budget_plan(session, user.family_id, payload.month, items)
+    total = sum((item.amount for item in payload.items), 0)
+    return {"month": payload.month.strftime("%Y-%m"), "categories": len(items), "total": str(total)}
 
 
 @router.post("/expense")
@@ -118,4 +214,3 @@ async def list_goals(telegram_id: int, session: AsyncSession = Depends(get_sessi
 async def get_report(telegram_id: int, period: str = "monthly", session: AsyncSession = Depends(get_session)) -> dict:
     user = await user_by_telegram_id(session, telegram_id)
     return {"period": period, "text": await reports.text_report(session, user.family_id, period)}
-
