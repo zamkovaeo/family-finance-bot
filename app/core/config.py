@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     stt_model: str = "whisper-1"
     default_currency: str = "RUB"
     admin_invite_code: str = ""
+    public_app_url: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
