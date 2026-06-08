@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>FinanceBot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/miniapp/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">FinanceBot</p>
+          <h1 id="screen-title">Бюджет</h1>
+        </div>
+        <button class="icon-button" id="refresh-button" aria-label="Обновить">↻</button>
+      </section>
+
+      <section id="dev-login" class="panel hidden">
+        <p class="muted">Открыто вне Telegram. Введите Telegram ID для теста.</p>
+        <div class="row">
+          <input id="dev-telegram-id" inputmode="numeric" placeholder="Telegram ID" />
+          <button id="dev-login-button">Войти</button>
+        </div>
+      </section>
+
+      <section id="toast" class="toast hidden"></section>
+
+      <section id="screen-dashboard" class="screen active">
+        <div class="summary-grid">
+          <article class="metric-card">
+            <span>Баланс</span>
+            <strong id="balance-value">0 ₽</strong>
+          </article>
+          <article class="metric-card">
+            <span>Расходы за 30 дней</span>
+            <strong id="expense-value">0 ₽</strong>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="section-head">
+            <h2>Остатки бюджета</h2>
+            <button class="text-button" data-tab="budget">План</button>
+          </div>
+          <div id="budget-list" class="budget-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-head">
+            <h2>Расходы по категориям</h2>
+            <button class="text-button" data-tab="analytics">Все</button>
+          </div>
+          <div class="donut-wrap">
+            <svg id="category-donut" viewBox="0 0 120 120" aria-label="Диаграмма категорий"></svg>
+            <div id="category-legend" class="legend"></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="screen-operation" class="screen">
+        <article class="panel">
+          <div class="segmented">
+            <button class="segment active" data-type="expense">Расход</button>
+            <button class="segment" data-type="income">Доход</button>
+          </div>
+          <label>Сумма</label>
+          <input id="tx-amount" inputmode="decimal" placeholder="0" />
+          <label>Дата</label>
+          <input id="tx-date" type="date" />
+          <label>Категория</label>
+          <div id="category-picker" class="chip-grid"></div>
+          <label>Комментарий</label>
+          <input id="tx-comment" placeholder="Например, кофе у дома" />
+          <label>Тег проекта</label>
+          <input id="tx-tag" placeholder="ремонт, отпуск, автомобиль" />
+          <div class="toggle-line">
+            <span>Личная операция</span>
+            <label class="switch">
+              <input id="tx-personal" type="checkbox" />
+              <span></span>
+            </label>
+          </div>
+          <button id="save-transaction" class="primary-button">Сохранить</button>
+        </article>
+      </section>
+
+      <section id="screen-budget" class="screen">
+        <article class="panel">
+          <div class="section-head">
+            <h2>План месяца</h2>
+            <input id="budget-month" type="month" />
+          </div>
+          <div id="budget-editor" class="budget-editor"></div>
+          <div class="total-row">
+            <span>Итого</span>
+            <strong id="budget-total">0 ₽</strong>
+          </div>
+          <button id="save-budget-plan" class="primary-button">Сохранить лимиты</button>
+        </article>
+      </section>
+
+      <section id="screen-analytics" class="screen">
+        <article class="panel">
+          <h2>Динамика расходов</h2>
+          <svg id="daily-bars" class="chart" viewBox="0 0 320 160"></svg>
+        </article>
+        <article class="panel">
+          <h2>Сравнение месяцев</h2>
+          <svg id="month-bars" class="chart" viewBox="0 0 320 170"></svg>
+        </article>
+      </section>
+
+      <section id="screen-goals" class="screen">
+        <article class="panel">
+          <div class="section-head">
+            <h2>Цели</h2>
+          </div>
+          <div id="goals-list" class="goals-list"></div>
+        </article>
+        <article class="panel">
+          <label>Название цели</label>
+          <input id="goal-title" placeholder="Отпуск" />
+          <label>Целевая сумма</label>
+          <input id="goal-amount" inputmode="decimal" placeholder="300000" />
+          <button id="save-goal" class="primary-button">Добавить цель</button>
+        </article>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-tab="dashboard">Бюджет</button>
+      <button class="nav-item" data-tab="operation">Операция</button>
+      <button class="nav-item" data-tab="budget">План</button>
+      <button class="nav-item" data-tab="analytics">Аналитика</button>
+      <button class="nav-item" data-tab="goals">Цели</button>
+    </nav>
+
+    <script src="/miniapp/app.js"></script>
+  </body>
+</html>
