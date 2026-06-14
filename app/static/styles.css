@@ -222,6 +222,7 @@ label {
 input,
 select {
   width: 100%;
+  min-width: 0;
   min-height: 44px;
   border: 1px solid var(--line);
   background: #0b1a22;
@@ -647,7 +648,17 @@ select:focus {
 }
 
 .history-filters label {
+  display: grid;
+  gap: 7px;
   margin: 0;
+  min-width: 0;
+}
+
+.history-filters label:nth-child(3),
+.history-filters label:nth-child(4),
+.history-filters label:nth-child(5),
+.history-filters .secondary-button {
+  grid-column: 1 / -1;
 }
 
 .history-filters .secondary-button {
