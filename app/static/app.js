@@ -55,6 +55,13 @@ function nextMonthISO() {
   return date.toISOString().slice(0, 7);
 }
 
+function urlTelegramId() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("telegram_id") || params.get("tg_id");
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 function showToast(text) {
   const toast = qs("#toast");
   toast.textContent = text;
@@ -87,9 +94,19 @@ async function bootstrap() {
       }),
     });
   } else {
-    qs("#dev-login").classList.remove("hidden");
+    const urlId = urlTelegramId();
     const saved = localStorage.getItem("devTelegramId");
-    if (saved) state.telegramId = Number(saved);
+    if (urlId) {
+      state.telegramId = urlId;
+      localStorage.setItem("devTelegramId", String(urlId));
+      await api("/miniapp/bootstrap", {
+        method: "POST",
+        body: JSON.stringify({ telegram_id: state.telegramId, first_name: "Telegram" }),
+      });
+    } else {
+      qs("#dev-login").classList.remove("hidden");
+      if (saved) state.telegramId = Number(saved);
+    }
   }
 
   qs("#tx-date").value = todayISO();
