@@ -657,6 +657,7 @@ select:focus {
 .history-filters label:nth-child(3),
 .history-filters label:nth-child(4),
 .history-filters label:nth-child(5),
+.history-filters label:nth-child(6),
 .history-filters .secondary-button {
   grid-column: 1 / -1;
 }
