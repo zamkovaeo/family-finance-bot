@@ -29,3 +29,11 @@ INCOME_CATEGORIES = [
 
 def category_defaults(kind: CategoryKind) -> list[tuple[str, str, list[str]]]:
     return EXPENSE_CATEGORIES if kind == CategoryKind.expense else INCOME_CATEGORIES
+
+
+def budget_plan_categories() -> list[tuple[str, str, list[str]]]:
+    items = [item for item in EXPENSE_CATEGORIES if item[0] not in {"Подарки", "Прочее"}]
+    other = next((item for item in EXPENSE_CATEGORIES if item[0] == "Прочее"), None)
+    if other:
+        items.append(other)
+    return items
