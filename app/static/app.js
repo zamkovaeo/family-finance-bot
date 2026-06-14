@@ -199,6 +199,16 @@ function renderHistoryMemberFilter() {
   memberSelect.value = state.members.some((member) => member.id === selected) ? selected : "";
 }
 
+function historyCategoryOptions(tx) {
+  const categories = state.categories[tx.type] || [];
+  return categories
+    .map((item) => {
+      const selected = item.name === tx.category ? "selected" : "";
+      return `<option value="${item.name}" ${selected}>${item.emoji} ${item.name}</option>`;
+    })
+    .join("");
+}
+
 function renderCategoryPicker() {
   const list = state.categories[state.txType] || [];
   if (!state.selectedCategory || !list.some((item) => item.name === state.selectedCategory)) {
@@ -372,10 +382,29 @@ function renderHistory() {
         <div class="history-main">
           <div class="row-title"><strong>${tx.comment || tx.category}</strong><span class="${isIncome ? "income" : "expense"}">${sign}${money(tx.amount)}</span></div>
           <div class="history-meta">${tx.category} · ${scope}${user}${tag}</div>
+          <label class="history-category-edit">
+            Категория
+            <select data-history-category="${tx.id}" data-history-type="${tx.type}">
+              ${historyCategoryOptions(tx)}
+            </select>
+          </label>
         </div>
       </div>`;
     })
     .join("");
+  qsa("[data-history-category]").forEach((select) =>
+    select.addEventListener("change", () => updateHistoryCategory(select.dataset.historyCategory, select.value)),
+  );
+}
+
+async function updateHistoryCategory(transactionId, category) {
+  if (!transactionId || !category) return;
+  await api(`/miniapp/transactions/${state.telegramId}/${transactionId}/category`, {
+    method: "PATCH",
+    body: JSON.stringify({ category }),
+  });
+  showToast("Категория обновлена");
+  await loadAll();
 }
 
 async function loadBudgetTemplate() {
