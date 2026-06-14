@@ -25,10 +25,27 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function formatDateISO(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function currentMonthStartISO() {
+  const date = new Date();
+  return formatDateISO(new Date(date.getFullYear(), date.getMonth(), 1));
+}
+
+function currentMonthEndISO() {
+  const date = new Date();
+  return formatDateISO(new Date(date.getFullYear(), date.getMonth() + 1, 0));
+}
+
 function daysAgoISO(days) {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
+  return formatDateISO(date);
 }
 
 function nextMonthISO() {
@@ -75,8 +92,10 @@ async function bootstrap() {
   }
 
   qs("#tx-date").value = todayISO();
-  qs("#history-from").value = daysAgoISO(30);
-  qs("#history-to").value = todayISO();
+  qs("#history-from").value = currentMonthStartISO();
+  qs("#history-to").value = currentMonthEndISO();
+  qs("#history-scope").value = "";
+  qs("#history-type").value = "";
   qs("#budget-month").value = nextMonthISO();
 
   bindEvents();
@@ -149,7 +168,9 @@ async function loadAll() {
 }
 
 function renderHistoryCategoryFilter() {
-  const categories = [...state.categories.expense, ...state.categories.income];
+  const categorySelect = qs("#history-category");
+  const selected = categorySelect.value;
+  const categories = [...(state.categories.expense || []), ...(state.categories.income || [])];
   const seen = new Set();
   const options = [`<option value="">Все категории</option>`];
   categories.forEach((item) => {
@@ -157,7 +178,8 @@ function renderHistoryCategoryFilter() {
     seen.add(item.name);
     options.push(`<option value="${item.name}">${item.emoji} ${item.name}</option>`);
   });
-  qs("#history-category").innerHTML = options.join("");
+  categorySelect.innerHTML = options.join("");
+  categorySelect.value = categories.some((item) => item.name === selected) ? selected : "";
 }
 
 function renderCategoryPicker() {
