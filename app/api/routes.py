@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, select
@@ -62,6 +63,32 @@ async def miniapp_categories(telegram_id: int, session: AsyncSession = Depends(g
     return {"expense": by_kind[CategoryKind.expense], "income": by_kind[CategoryKind.income]}
 
 
+@router.get("/miniapp/family-members/{telegram_id}")
+async def miniapp_family_members(telegram_id: int, session: AsyncSession = Depends(get_session)) -> dict:
+    user = await user_by_telegram_id(session, telegram_id)
+    members = list(
+        (
+            await session.scalars(
+                select(User)
+                .where(User.family_id == user.family_id)
+                .order_by(User.created_at.asc())
+            )
+        ).all()
+    )
+    return {
+        "items": [
+            {
+                "id": str(member.id),
+                "telegram_id": member.telegram_id,
+                "name": member.first_name or member.username or "Участник",
+                "role": member.role.value,
+                "is_current": member.id == user.id,
+            }
+            for member in members
+        ]
+    }
+
+
 @router.post("/miniapp/transactions")
 async def miniapp_add_transaction(
     payload: ManualTransactionCreate,
@@ -97,6 +124,7 @@ async def miniapp_transactions(
     category: str | None = None,
     scope: str | None = Query(default=None, pattern="^(personal|family)$"),
     tx_type: TransactionType | None = None,
+    member_id: UUID | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     user = await user_by_telegram_id(session, telegram_id)
@@ -113,6 +141,11 @@ async def miniapp_transactions(
         conditions.append(Transaction.is_personal.is_(False))
     if category:
         conditions.append(Category.name == category)
+    if member_id:
+        member = await session.scalar(select(User.id).where(User.id == member_id, User.family_id == user.family_id))
+        if not member:
+            raise HTTPException(status_code=404, detail="Family member not found")
+        conditions.append(Transaction.user_id == member_id)
 
     stmt = (
         select(Transaction)
