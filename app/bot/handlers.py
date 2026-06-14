@@ -28,6 +28,21 @@ analytics = AnalyticsService()
 reports = ReportingService()
 
 
+def mini_app_markup() -> InlineKeyboardMarkup | None:
+    if not settings.public_app_url:
+        return None
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🚀 Открыть Mini App",
+                    web_app=WebAppInfo(url=settings.public_app_url),
+                )
+            ]
+        ]
+    )
+
+
 class InputState(StatesGroup):
     expense = State()
     income = State()
@@ -59,23 +74,15 @@ async def start(message: Message, command: CommandObject) -> None:
         "Готов вести семейный бюджет.\n\n"
         f"Ваша роль: {role_text}\n"
         f"Код приглашения семьи: {family.invite_code}\n\n"
-        "Можно писать сразу: Кофе 350 #отпуск личное 07.06.2026\n"
-        "Или откройте Mini App для удобного учета.",
+        "В чате можно быстро добавить расход или доход:\n"
+        "Кофе 350 #отпуск личное 07.06.2026\n\n"
+        "Бюджет, история, аналитика, цели и настройки доступны в Mini App.",
         reply_markup=main_menu(),
     )
     if settings.public_app_url:
         await message.answer(
             "Открыть финансовое приложение",
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="Открыть Mini App",
-                            web_app=WebAppInfo(url=settings.public_app_url),
-                        )
-                    ]
-                ]
-            ),
+            reply_markup=mini_app_markup(),
         )
 
 
@@ -83,6 +90,15 @@ async def start(message: Message, command: CommandObject) -> None:
 async def back_to_menu(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer("Главное меню", reply_markup=main_menu())
+
+
+@router.message(F.text == "🚀 Открыть Mini App")
+async def open_mini_app_button(message: Message) -> None:
+    await current_user(message)
+    if settings.public_app_url:
+        await message.answer("Открыть Mini App", reply_markup=mini_app_markup())
+        return
+    await message.answer("Mini App пока не настроен.", reply_markup=main_menu())
 
 
 @router.message(F.text == "➕ Расход")
@@ -97,6 +113,25 @@ async def ask_income(message: Message, state: FSMContext) -> None:
     await current_user(message)
     await state.set_state(InputState.income)
     await message.answer("Введите доход: Зарплата 180000 01.06.2026")
+
+
+@router.message(
+    F.text.in_(
+        {
+            "📊 Мой бюджет",
+            "👨‍👩‍👧 Семейный бюджет",
+            "📈 Отчеты и аналитика",
+            "🎯 Цели",
+            "⚙️ Настройки",
+        }
+    )
+)
+async def redirect_old_menu_to_mini_app(message: Message) -> None:
+    await current_user(message)
+    await message.answer(
+        "Этот раздел теперь в Mini App. В чате оставила быстрый ввод расходов и доходов.",
+        reply_markup=mini_app_markup() or main_menu(),
+    )
 
 
 @router.message(InputState.expense)
