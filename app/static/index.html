@@ -10,9 +10,12 @@
   <body>
     <main class="app-shell">
       <section class="topbar">
-        <div>
+        <div class="brand-row">
+          <div class="app-logo">🤖</div>
+          <div>
           <p class="eyebrow">FinanceBot</p>
           <h1 id="screen-title">Бюджет</h1>
+          </div>
         </div>
         <button class="icon-button" id="refresh-button" aria-label="Обновить">↻</button>
       </section>
@@ -28,6 +31,20 @@
       <section id="toast" class="toast hidden"></section>
 
       <section id="screen-dashboard" class="screen active">
+        <article class="assistant-card">
+          <div class="assistant-icon">💚</div>
+          <div>
+            <h2>Ваш финансовый помощник</h2>
+            <p>Контролируйте лимиты, расходы и цели семьи в одном приложении.</p>
+          </div>
+        </article>
+
+        <div class="quick-actions">
+          <button class="action-card" data-tab="operation"><span>➕</span>Добавить расход</button>
+          <button class="action-card" data-tab="budget"><span>📅</span>План месяца</button>
+          <button class="action-card" data-tab="analytics"><span>📊</span>Отчеты</button>
+        </div>
+
         <div class="summary-grid">
           <article class="metric-card">
             <span>Баланс</span>
@@ -61,6 +78,10 @@
 
       <section id="screen-operation" class="screen">
         <article class="panel">
+          <div class="section-intro">
+            <h2>Новая операция</h2>
+            <p>Выберите тип, дату, категорию и принадлежность расхода.</p>
+          </div>
           <div class="segmented">
             <button class="segment active" data-type="expense">Расход</button>
             <button class="segment" data-type="income">Доход</button>
@@ -89,7 +110,10 @@
       <section id="screen-budget" class="screen">
         <article class="panel">
           <div class="section-head">
-            <h2>План месяца</h2>
+            <div>
+              <h2>План месяца</h2>
+              <p class="muted compact">Суммы прошлого месяца подставляются автоматически.</p>
+            </div>
             <input id="budget-month" type="month" />
           </div>
           <div id="budget-editor" class="budget-editor"></div>
@@ -130,11 +154,11 @@
     </main>
 
     <nav class="bottom-nav">
-      <button class="nav-item active" data-tab="dashboard">Бюджет</button>
-      <button class="nav-item" data-tab="operation">Операция</button>
-      <button class="nav-item" data-tab="budget">План</button>
-      <button class="nav-item" data-tab="analytics">Аналитика</button>
-      <button class="nav-item" data-tab="goals">Цели</button>
+      <button class="nav-item active" data-tab="dashboard">💰<span>Бюджет</span></button>
+      <button class="nav-item" data-tab="operation">➕<span>Операция</span></button>
+      <button class="nav-item" data-tab="budget">📅<span>План</span></button>
+      <button class="nav-item" data-tab="analytics">📊<span>Аналитика</span></button>
+      <button class="nav-item" data-tab="goals">🎯<span>Цели</span></button>
     </nav>
 
     <script src="/miniapp/app.js"></script>
