@@ -54,6 +54,10 @@ class ManualTransactionCreate(BaseModel):
     is_personal: bool = False
 
 
+class TransactionCategoryUpdate(BaseModel):
+    category: str
+
+
 class BudgetPlanItem(BaseModel):
     category: str
     amount: Decimal = Field(ge=0)
