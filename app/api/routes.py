@@ -16,6 +16,7 @@ from app.schemas.finance import (
     ManualTransactionCreate,
     MiniAppBootstrap,
     OperationCreate,
+    TransactionCategoryUpdate,
 )
 from app.services.defaults import EXPENSE_CATEGORIES, INCOME_CATEGORIES
 from app.services.family_service import ensure_user
@@ -179,6 +180,40 @@ async def miniapp_transactions(
             "expense": str(total_expense),
             "balance": str(total_income - total_expense),
         },
+    }
+
+
+@router.patch("/miniapp/transactions/{telegram_id}/{transaction_id}/category")
+async def miniapp_update_transaction_category(
+    telegram_id: int,
+    transaction_id: UUID,
+    payload: TransactionCategoryUpdate,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    user = await user_by_telegram_id(session, telegram_id)
+    tx = await session.scalar(
+        select(Transaction)
+        .options(selectinload(Transaction.category))
+        .where(Transaction.id == transaction_id, Transaction.family_id == user.family_id)
+    )
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    category_name = payload.category.strip()
+    if not category_name:
+        raise HTTPException(status_code=400, detail="Category is required")
+
+    kind = CategoryKind.expense if tx.type == TransactionType.expense else CategoryKind.income
+    category = await finance._get_or_create_category(session, user.family_id, category_name, kind)
+    tx.category_id = category.id
+    if not tx.comment or tx.comment == (tx.category.name if tx.category else None):
+        tx.comment = category.name
+    await session.commit()
+    await session.refresh(tx)
+    return {
+        "id": str(tx.id),
+        "category": category.name,
+        "emoji": category.emoji,
     }
 
 
