@@ -9,7 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, Message, ReplyKeyboardMarkup, WebAppInfo
 from sqlalchemy import select
 
-from app.bot.keyboards import analytics_menu, goals_menu, main_menu, settings_menu
+from app.bot.keyboards import analytics_menu, goals_menu, main_menu, mini_app_url, settings_menu
 from app.db.session import SessionLocal
 from app.models.entities import Family, User
 from app.models.enums import TransactionType
@@ -28,7 +28,7 @@ analytics = AnalyticsService()
 reports = ReportingService()
 
 
-def mini_app_markup() -> InlineKeyboardMarkup | None:
+def mini_app_markup(telegram_id: int | None = None) -> InlineKeyboardMarkup | None:
     if not settings.public_app_url:
         return None
     return InlineKeyboardMarkup(
@@ -36,7 +36,7 @@ def mini_app_markup() -> InlineKeyboardMarkup | None:
             [
                 InlineKeyboardButton(
                     text="🚀 Открыть Mini App",
-                    web_app=WebAppInfo(url=settings.public_app_url),
+                    web_app=WebAppInfo(url=mini_app_url(telegram_id)),
                 )
             ]
         ]
@@ -77,28 +77,28 @@ async def start(message: Message, command: CommandObject) -> None:
         "В чате можно быстро добавить расход или доход:\n"
         "Кофе 350 #отпуск личное 07.06.2026\n\n"
         "Бюджет, история, аналитика, цели и настройки доступны в Mini App.",
-        reply_markup=main_menu(),
+        reply_markup=main_menu(user.telegram_id),
     )
     if settings.public_app_url:
         await message.answer(
             "Открыть финансовое приложение",
-            reply_markup=mini_app_markup(),
+            reply_markup=mini_app_markup(user.telegram_id),
         )
 
 
 @router.message(F.text == "⬅️ Главное меню")
 async def back_to_menu(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer("Главное меню", reply_markup=main_menu())
+    await message.answer("Главное меню", reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(F.text == "🚀 Открыть Mini App")
 async def open_mini_app_button(message: Message) -> None:
     await current_user(message)
     if settings.public_app_url:
-        await message.answer("Открыть Mini App", reply_markup=mini_app_markup())
+        await message.answer("Открыть Mini App", reply_markup=mini_app_markup(message.from_user.id))
         return
-    await message.answer("Mini App пока не настроен.", reply_markup=main_menu())
+    await message.answer("Mini App пока не настроен.", reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(F.text == "➕ Расход")
@@ -130,7 +130,7 @@ async def redirect_old_menu_to_mini_app(message: Message) -> None:
     await current_user(message)
     await message.answer(
         "Этот раздел теперь в Mini App. В чате оставила быстрый ввод расходов и доходов.",
-        reply_markup=mini_app_markup() or main_menu(),
+        reply_markup=mini_app_markup(message.from_user.id) or main_menu(message.from_user.id),
     )
 
 
@@ -159,7 +159,7 @@ async def show_budget(message: Message) -> None:
         await message.answer(
             "Лимиты на текущий месяц пока не заданы.\n\n"
             "Откройте Настройки → Задать лимит и введите: Продукты 60000",
-            reply_markup=main_menu(),
+            reply_markup=main_menu(message.from_user.id),
         )
         return
 
@@ -172,7 +172,7 @@ async def show_budget(message: Message) -> None:
         )
     lines.append("")
     lines.append(f"Всего: доходы {money(balance['income'])}, расходы {money(balance['expense'])}, баланс {money(balance['balance'])}")
-    await message.answer("\n\n".join(lines), reply_markup=main_menu())
+    await message.answer("\n\n".join(lines), reply_markup=main_menu(message.from_user.id))
 
 
 @router.message(F.text == "📈 Отчеты и аналитика")
@@ -475,7 +475,7 @@ async def add_operation(
             tx, alerts = await finance.add_from_text(session, user, text, default_type)
             family_users = list((await session.scalars(select(User).where(User.family_id == user.family_id))).all())
     except ValueError as exc:
-        await message.answer(str(exc), reply_markup=main_menu())
+        await message.answer(str(exc), reply_markup=main_menu(message.from_user.id))
         return
 
     sign = "Доход" if tx.type == TransactionType.income else "Расход"
@@ -486,7 +486,7 @@ async def add_operation(
         f"{tx.category.emoji} {tx.category.name}: {money(tx.amount)}\n"
         f"{tx.comment} · {scope}{tag}\n"
         f"Дата: {tx.date:%d.%m.%Y}",
-        reply_markup=main_menu(),
+        reply_markup=main_menu(message.from_user.id),
     )
     for alert in alerts:
         for member in family_users:
