@@ -1,16 +1,20 @@
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
+
+from app.core.config import settings
 
 
 def main_menu() -> ReplyKeyboardMarkup:
+    mini_app_button = KeyboardButton(
+        text="🚀 Открыть Mini App",
+        web_app=WebAppInfo(url=settings.public_app_url) if settings.public_app_url else None,
+    )
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="➕ Расход"), KeyboardButton(text="💰 Доход")],
-            [KeyboardButton(text="📊 Мой бюджет"), KeyboardButton(text="👨‍👩‍👧 Семейный бюджет")],
-            [KeyboardButton(text="📈 Отчеты и аналитика"), KeyboardButton(text="🎯 Цели")],
-            [KeyboardButton(text="⚙️ Настройки")],
+            [mini_app_button],
         ],
         resize_keyboard=True,
-        input_field_placeholder="Например: Кофе 350 #отпуск личное",
+        input_field_placeholder="Быстрый ввод: Кофе 350",
     )
 
 
@@ -43,4 +47,3 @@ def settings_menu() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
     )
-
