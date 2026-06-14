@@ -136,6 +136,56 @@
         </article>
       </section>
 
+      <section id="screen-history" class="screen">
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <h2>История операций</h2>
+              <p class="muted compact">Лента как в банке: период, категории и личное/семейное.</p>
+            </div>
+          </div>
+          <div class="history-filters">
+            <label>
+              С
+              <input id="history-from" type="date" />
+            </label>
+            <label>
+              По
+              <input id="history-to" type="date" />
+            </label>
+            <label>
+              Категория
+              <select id="history-category"></select>
+            </label>
+            <label>
+              Тип бюджета
+              <select id="history-scope">
+                <option value="">Все</option>
+                <option value="personal">Личные</option>
+                <option value="family">Семейные</option>
+              </select>
+            </label>
+            <label>
+              Операция
+              <select id="history-type">
+                <option value="">Все</option>
+                <option value="expense">Расходы</option>
+                <option value="income">Доходы</option>
+              </select>
+            </label>
+            <button id="apply-history-filters" class="secondary-button">Показать</button>
+          </div>
+        </article>
+        <article class="panel">
+          <div class="history-summary">
+            <div><span>Доходы</span><strong id="history-income">0 ₽</strong></div>
+            <div><span>Расходы</span><strong id="history-expense">0 ₽</strong></div>
+            <div><span>Итог</span><strong id="history-balance">0 ₽</strong></div>
+          </div>
+          <div id="history-list" class="history-list"></div>
+        </article>
+      </section>
+
       <section id="screen-goals" class="screen">
         <article class="panel">
           <div class="section-head">
@@ -157,6 +207,7 @@
       <button class="nav-item active" data-tab="dashboard">💰<span>Бюджет</span></button>
       <button class="nav-item" data-tab="operation">➕<span>Операция</span></button>
       <button class="nav-item" data-tab="budget">📅<span>План</span></button>
+      <button class="nav-item" data-tab="history">🧾<span>История</span></button>
       <button class="nav-item" data-tab="analytics">📊<span>Аналитика</span></button>
       <button class="nav-item" data-tab="goals">🎯<span>Цели</span></button>
     </nav>
