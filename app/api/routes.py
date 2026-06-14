@@ -2,12 +2,12 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, select
+from sqlalchemy import and_, delete, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.models.entities import Category, Tag, Transaction, User
+from app.models.entities import Budget, Category, Goal, Report, Tag, Transaction, User
 from app.models.enums import CategoryKind, TransactionType
 from app.schemas.finance import (
     BudgetCreate,
@@ -103,6 +103,24 @@ async def miniapp_tags(telegram_id: int, session: AsyncSession = Depends(get_ses
         ).all()
     )
     return {"items": [{"name": tag.name} for tag in tags]}
+
+
+@router.post("/miniapp/admin/clear-family-data/{telegram_id}")
+async def miniapp_clear_family_data(
+    telegram_id: int,
+    confirm: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if confirm != "clear-test-data-310753105":
+        raise HTTPException(status_code=403, detail="Invalid confirmation")
+    user = await user_by_telegram_id(session, telegram_id)
+    family_id = user.family_id
+    deleted = {}
+    for model in (Transaction, Budget, Goal, Report, Tag, Category):
+        result = await session.execute(delete(model).where(model.family_id == family_id))
+        deleted[model.__tablename__] = result.rowcount or 0
+    await session.commit()
+    return {"family_id": str(family_id), "deleted": deleted}
 
 
 @router.post("/miniapp/transactions")
