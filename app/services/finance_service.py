@@ -230,6 +230,41 @@ class FinanceService:
             "balance": values[TransactionType.income] - values[TransactionType.expense],
         }
 
+    async def category_budget_status(
+        self,
+        session: AsyncSession,
+        family_id,
+        category_id,
+        operation_date: datetime,
+    ) -> dict[str, Decimal] | None:
+        operation_month = month_start(operation_date)
+        budget = await session.scalar(
+            select(Budget).where(
+                Budget.family_id == family_id,
+                Budget.category_id == category_id,
+                Budget.month == operation_month,
+            )
+        )
+        if not budget:
+            return None
+
+        spent = await session.scalar(
+            select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+                Transaction.family_id == family_id,
+                Transaction.category_id == category_id,
+                Transaction.type == TransactionType.expense,
+                extract("year", Transaction.date) == operation_month.year,
+                extract("month", Transaction.date) == operation_month.month,
+            )
+        )
+        spent = Decimal(spent)
+        limit = Decimal(budget.limit_amount)
+        return {
+            "limit": limit,
+            "spent": spent,
+            "left": limit - spent,
+        }
+
     async def check_limit_alerts(self, session: AsyncSession, family_id, category_id, operation_date: datetime | None = None) -> list[str]:
         operation_month = month_start(operation_date)
         if operation_month != month_start():
