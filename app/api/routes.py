@@ -1,11 +1,12 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.models.entities import Category, User
+from app.models.entities import Category, Transaction, User
 from app.models.enums import CategoryKind, TransactionType
 from app.schemas.finance import (
     BudgetCreate,
@@ -85,6 +86,66 @@ async def miniapp_add_transaction(
         "category": tx.category.name,
         "date": tx.date.isoformat(),
         "alerts": alerts,
+    }
+
+
+@router.get("/miniapp/transactions/{telegram_id}")
+async def miniapp_transactions(
+    telegram_id: int,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    category: str | None = None,
+    scope: str | None = Query(default=None, pattern="^(personal|family)$"),
+    tx_type: TransactionType | None = None,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    user = await user_by_telegram_id(session, telegram_id)
+    conditions = [Transaction.family_id == user.family_id]
+    if date_from:
+        conditions.append(Transaction.date >= date_from)
+    if date_to:
+        conditions.append(Transaction.date <= date_to)
+    if tx_type:
+        conditions.append(Transaction.type == tx_type)
+    if scope == "personal":
+        conditions.append(Transaction.is_personal.is_(True))
+    elif scope == "family":
+        conditions.append(Transaction.is_personal.is_(False))
+    if category:
+        conditions.append(Category.name == category)
+
+    stmt = (
+        select(Transaction)
+        .join(Category, Category.id == Transaction.category_id)
+        .options(selectinload(Transaction.category), selectinload(Transaction.tag), selectinload(Transaction.user))
+        .where(and_(*conditions))
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .limit(200)
+    )
+    transactions = list((await session.scalars(stmt)).all())
+    total_income = sum((tx.amount for tx in transactions if tx.type == TransactionType.income), 0)
+    total_expense = sum((tx.amount for tx in transactions if tx.type == TransactionType.expense), 0)
+    return {
+        "items": [
+            {
+                "id": str(tx.id),
+                "date": tx.date.isoformat(),
+                "amount": str(tx.amount),
+                "type": tx.type.value,
+                "category": tx.category.name if tx.category else "Прочее",
+                "emoji": tx.category.emoji if tx.category else "📦",
+                "comment": tx.comment,
+                "tag": tx.tag.name if tx.tag else None,
+                "is_personal": tx.is_personal,
+                "user": tx.user.first_name or tx.user.username or "Участник",
+            }
+            for tx in transactions
+        ],
+        "summary": {
+            "income": str(total_income),
+            "expense": str(total_expense),
+            "balance": str(total_income - total_expense),
+        },
     }
 
 
