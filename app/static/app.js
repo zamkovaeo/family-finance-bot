@@ -9,6 +9,7 @@ const state = {
   selectedCategory: null,
   analytics: null,
   history: [],
+  members: [],
 };
 
 const colors = ["#18c08f", "#ffad32", "#ff5b5b", "#48a5ff", "#a777ff", "#f05d9b", "#47d7c5"];
@@ -95,6 +96,7 @@ async function bootstrap() {
   qs("#history-from").value = currentMonthStartISO();
   qs("#history-to").value = currentMonthEndISO();
   qs("#history-scope").value = "";
+  qs("#history-member").value = "";
   qs("#history-type").value = "";
   qs("#budget-month").value = nextMonthISO();
 
@@ -110,7 +112,7 @@ function bindEvents() {
   qs("#save-goal").addEventListener("click", saveGoal);
   qs("#budget-month").addEventListener("change", loadBudgetTemplate);
   qs("#apply-history-filters").addEventListener("click", loadHistory);
-  ["#history-from", "#history-to", "#history-category", "#history-scope", "#history-type"].forEach((selector) =>
+  ["#history-from", "#history-to", "#history-category", "#history-scope", "#history-member", "#history-type"].forEach((selector) =>
     qs(selector).addEventListener("change", loadHistory),
   );
   qs("#refresh-button").addEventListener("click", loadAll);
@@ -150,15 +152,18 @@ function setTxType(type) {
 
 async function loadAll() {
   if (!state.telegramId) return;
-  const [categories, budget, analytics, goals] = await Promise.all([
+  const [categories, members, budget, analytics, goals] = await Promise.all([
     api(`/miniapp/categories/${state.telegramId}`),
+    api(`/miniapp/family-members/${state.telegramId}`),
     api(`/budget/${state.telegramId}`),
     api(`/analytics/${state.telegramId}`),
     api(`/goals/${state.telegramId}`),
   ]);
   state.categories = categories;
+  state.members = members.items || [];
   state.analytics = analytics;
   renderHistoryCategoryFilter();
+  renderHistoryMemberFilter();
   renderCategoryPicker();
   renderBudget(budget.items);
   renderAnalytics(analytics);
@@ -180,6 +185,18 @@ function renderHistoryCategoryFilter() {
   });
   categorySelect.innerHTML = options.join("");
   categorySelect.value = categories.some((item) => item.name === selected) ? selected : "";
+}
+
+function renderHistoryMemberFilter() {
+  const memberSelect = qs("#history-member");
+  const selected = memberSelect.value;
+  const options = [`<option value="">Все участники</option>`];
+  state.members.forEach((member) => {
+    const label = member.is_current ? `${member.name} (я)` : member.name;
+    options.push(`<option value="${member.id}">${label}</option>`);
+  });
+  memberSelect.innerHTML = options.join("");
+  memberSelect.value = state.members.some((member) => member.id === selected) ? selected : "";
 }
 
 function renderCategoryPicker() {
@@ -316,11 +333,13 @@ async function loadHistory() {
   const to = qs("#history-to").value;
   const category = qs("#history-category").value;
   const scope = qs("#history-scope").value;
+  const memberId = qs("#history-member").value;
   const txType = qs("#history-type").value;
   if (from) params.set("date_from", new Date(`${from}T00:00:00`).toISOString());
   if (to) params.set("date_to", new Date(`${to}T23:59:59`).toISOString());
   if (category) params.set("category", category);
   if (scope) params.set("scope", scope);
+  if (memberId) params.set("member_id", memberId);
   if (txType) params.set("tx_type", txType);
   const data = await api(`/miniapp/transactions/${state.telegramId}?${params.toString()}`);
   state.history = data.items || [];
@@ -346,12 +365,13 @@ function renderHistory() {
       const isIncome = tx.type === "income";
       const sign = isIncome ? "+" : "-";
       const scope = tx.is_personal ? "Личное" : "Семейное";
+      const user = tx.user ? ` · ${tx.user}` : "";
       const tag = tx.tag ? ` · #${tx.tag}` : "";
       return `${header}<div class="history-item">
         <div class="history-icon">${tx.emoji}</div>
         <div class="history-main">
           <div class="row-title"><strong>${tx.comment || tx.category}</strong><span class="${isIncome ? "income" : "expense"}">${sign}${money(tx.amount)}</span></div>
-          <div class="history-meta">${tx.category} · ${scope}${tag}</div>
+          <div class="history-meta">${tx.category} · ${scope}${user}${tag}</div>
         </div>
       </div>`;
     })
