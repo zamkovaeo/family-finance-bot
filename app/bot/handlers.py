@@ -18,7 +18,7 @@ from app.services.family_service import ensure_user
 from app.services.finance_service import FinanceService
 from app.services.llm_service import transcribe_voice
 from app.services.reporting_service import ReportingService
-from app.services.defaults import EXPENSE_CATEGORIES
+from app.services.defaults import budget_plan_categories
 from app.utils.formatting import money, percent_text, progress_bar
 from app.core.config import settings
 
@@ -380,9 +380,7 @@ def build_budget_template(target_month: datetime, previous_values: dict[str, Dec
         f"Месяц: {target_month:%m.%Y}",
         "",
     ]
-    for name, emoji, _keywords in EXPENSE_CATEGORIES:
-        if name == "Прочее":
-            continue
+    for name, emoji, _keywords in budget_plan_categories():
         amount = previous_values.get(name)
         value = money(amount).replace(" ₽", "") if amount else ""
         lines.append(f"{emoji} {name} — {value}")
@@ -396,7 +394,7 @@ def build_budget_template(target_month: datetime, previous_values: dict[str, Dec
 def parse_budget_plan(text: str) -> tuple[datetime, list[tuple[str, Decimal]]]:
     month = None
     items: list[tuple[str, Decimal]] = []
-    category_names = {name.lower(): name for name, _emoji, _keywords in EXPENSE_CATEGORIES}
+    category_names = {name.lower(): name for name, _emoji, _keywords in budget_plan_categories()}
 
     for raw_line in text.splitlines():
         line = raw_line.strip()
