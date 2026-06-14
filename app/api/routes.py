@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.models.entities import Category, Transaction, User
+from app.models.entities import Category, Tag, Transaction, User
 from app.models.enums import CategoryKind, TransactionType
 from app.schemas.finance import (
     BudgetCreate,
@@ -90,6 +90,21 @@ async def miniapp_family_members(telegram_id: int, session: AsyncSession = Depen
     }
 
 
+@router.get("/miniapp/tags/{telegram_id}")
+async def miniapp_tags(telegram_id: int, session: AsyncSession = Depends(get_session)) -> dict:
+    user = await user_by_telegram_id(session, telegram_id)
+    tags = list(
+        (
+            await session.scalars(
+                select(Tag)
+                .where(Tag.family_id == user.family_id)
+                .order_by(Tag.name.asc())
+            )
+        ).all()
+    )
+    return {"items": [{"name": tag.name} for tag in tags]}
+
+
 @router.post("/miniapp/transactions")
 async def miniapp_add_transaction(
     payload: ManualTransactionCreate,
@@ -126,6 +141,7 @@ async def miniapp_transactions(
     scope: str | None = Query(default=None, pattern="^(personal|family)$"),
     tx_type: TransactionType | None = None,
     member_id: UUID | None = None,
+    tag: str | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     user = await user_by_telegram_id(session, telegram_id)
@@ -142,6 +158,8 @@ async def miniapp_transactions(
         conditions.append(Transaction.is_personal.is_(False))
     if category:
         conditions.append(Category.name == category)
+    if tag:
+        conditions.append(Tag.name == tag)
     if member_id:
         member = await session.scalar(select(User.id).where(User.id == member_id, User.family_id == user.family_id))
         if not member:
@@ -151,6 +169,7 @@ async def miniapp_transactions(
     stmt = (
         select(Transaction)
         .join(Category, Category.id == Transaction.category_id)
+        .outerjoin(Tag, Tag.id == Transaction.tag_id)
         .options(selectinload(Transaction.category), selectinload(Transaction.tag), selectinload(Transaction.user))
         .where(and_(*conditions))
         .order_by(Transaction.date.desc(), Transaction.id.desc())
