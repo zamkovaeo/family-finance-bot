@@ -396,3 +396,231 @@ input {
     grid-template-columns: 1fr;
   }
 }
+
+/* PRD visual pass: Telegram dark finance interface */
+body {
+  background:
+    linear-gradient(180deg, rgba(6, 24, 31, 0.86), rgba(4, 14, 20, 0.98)),
+    radial-gradient(circle at 18% 0%, rgba(24, 192, 143, 0.18), transparent 28%),
+    radial-gradient(circle at 100% 18%, rgba(72, 165, 255, 0.12), transparent 26%),
+    #061119;
+}
+
+.app-shell {
+  padding-top: max(16px, env(safe-area-inset-top));
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-logo,
+.assistant-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, #24d7a5, #0d8f75);
+  box-shadow: 0 10px 24px rgba(24, 192, 143, 0.28);
+  border-radius: 8px;
+}
+
+.app-logo {
+  width: 42px;
+  height: 42px;
+}
+
+.assistant-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 10px 0 12px;
+  background: linear-gradient(180deg, rgba(7, 19, 26, 0.96), rgba(7, 19, 26, 0));
+  backdrop-filter: blur(10px);
+}
+
+h1 {
+  font-size: 25px;
+  line-height: 1.12;
+}
+
+.assistant-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(24, 192, 143, 0.18);
+  background:
+    linear-gradient(135deg, rgba(24, 192, 143, 0.18), rgba(72, 165, 255, 0.08)),
+    rgba(16, 33, 43, 0.94);
+  border-radius: var(--radius);
+}
+
+.assistant-card p,
+.section-intro p,
+.compact {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.action-card {
+  display: grid;
+  gap: 7px;
+  min-height: 74px;
+  padding: 10px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 33, 43, 0.9);
+  color: var(--text);
+  border-radius: var(--radius);
+  font-size: 12px;
+  line-height: 1.18;
+  text-align: left;
+}
+
+.action-card span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.panel,
+.metric-card {
+  background:
+    linear-gradient(180deg, rgba(20, 43, 54, 0.96), rgba(9, 23, 31, 0.98)),
+    #10212b;
+  border-color: rgba(112, 150, 166, 0.18);
+}
+
+.metric-card {
+  min-height: 112px;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::after {
+  position: absolute;
+  right: -26px;
+  bottom: -30px;
+  width: 82px;
+  height: 82px;
+  background: rgba(24, 192, 143, 0.12);
+  border-radius: 50%;
+  content: "";
+}
+
+.metric-card strong {
+  position: relative;
+  z-index: 1;
+}
+
+.budget-row,
+.goal-row {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.row-title strong {
+  overflow-wrap: anywhere;
+}
+
+.progress {
+  height: 9px;
+  background: rgba(144, 167, 178, 0.18);
+}
+
+.progress span {
+  background: linear-gradient(90deg, #18c08f 0%, #24d7a5 58%, #ffad32 100%);
+}
+
+input {
+  background: rgba(6, 17, 25, 0.84);
+  border-color: rgba(144, 167, 178, 0.22);
+}
+
+input:focus {
+  border-color: rgba(24, 192, 143, 0.8);
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(24, 192, 143, 0.12);
+}
+
+.chip {
+  background: rgba(255, 255, 255, 0.035);
+  line-height: 1.2;
+}
+
+.chip.active {
+  box-shadow: inset 0 0 0 1px rgba(24, 192, 143, 0.38);
+}
+
+.primary-button {
+  box-shadow: 0 14px 32px rgba(24, 192, 143, 0.18);
+}
+
+.chart {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius);
+}
+
+.bottom-nav {
+  gap: 4px;
+  background: rgba(4, 14, 20, 0.92);
+}
+
+.nav-item {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.nav-item span {
+  display: block;
+  font-size: 11px;
+}
+
+.nav-item.active {
+  background: rgba(24, 192, 143, 0.14);
+  color: var(--text);
+}
+
+@media (min-width: 760px) {
+  .app-shell,
+  .bottom-nav {
+    width: min(100%, 720px);
+  }
+
+  .screen.active {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .assistant-card,
+  .quick-actions {
+    grid-column: 1 / -1;
+  }
+
+  #screen-operation.active,
+  #screen-budget.active,
+  #screen-goals.active {
+    grid-template-columns: 1fr;
+  }
+}
