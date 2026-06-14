@@ -8,6 +8,7 @@ const state = {
   categories: { expense: [], income: [] },
   selectedCategory: null,
   analytics: null,
+  history: [],
 };
 
 const colors = ["#18c08f", "#ffad32", "#ff5b5b", "#48a5ff", "#a777ff", "#f05d9b", "#47d7c5"];
@@ -22,6 +23,12 @@ function money(value) {
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function daysAgoISO(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
 }
 
 function nextMonthISO() {
@@ -68,6 +75,8 @@ async function bootstrap() {
   }
 
   qs("#tx-date").value = todayISO();
+  qs("#history-from").value = daysAgoISO(30);
+  qs("#history-to").value = todayISO();
   qs("#budget-month").value = nextMonthISO();
 
   bindEvents();
@@ -81,6 +90,10 @@ function bindEvents() {
   qs("#save-budget-plan").addEventListener("click", saveBudgetPlan);
   qs("#save-goal").addEventListener("click", saveGoal);
   qs("#budget-month").addEventListener("change", loadBudgetTemplate);
+  qs("#apply-history-filters").addEventListener("click", loadHistory);
+  ["#history-from", "#history-to", "#history-category", "#history-scope", "#history-type"].forEach((selector) =>
+    qs(selector).addEventListener("change", loadHistory),
+  );
   qs("#refresh-button").addEventListener("click", loadAll);
   qs("#dev-login-button").addEventListener("click", async () => {
     const value = qs("#dev-telegram-id").value.trim();
@@ -104,6 +117,7 @@ function switchTab(tab) {
     dashboard: "Бюджет",
     operation: "Операция",
     budget: "План месяца",
+    history: "История",
     analytics: "Аналитика",
     goals: "Цели",
   }[tab];
@@ -125,11 +139,25 @@ async function loadAll() {
   ]);
   state.categories = categories;
   state.analytics = analytics;
+  renderHistoryCategoryFilter();
   renderCategoryPicker();
   renderBudget(budget.items);
   renderAnalytics(analytics);
   renderGoals(goals.items);
+  await loadHistory();
   await loadBudgetTemplate();
+}
+
+function renderHistoryCategoryFilter() {
+  const categories = [...state.categories.expense, ...state.categories.income];
+  const seen = new Set();
+  const options = [`<option value="">Все категории</option>`];
+  categories.forEach((item) => {
+    if (seen.has(item.name)) return;
+    seen.add(item.name);
+    options.push(`<option value="${item.name}">${item.emoji} ${item.name}</option>`);
+  });
+  qs("#history-category").innerHTML = options.join("");
 }
 
 function renderCategoryPicker() {
@@ -257,6 +285,55 @@ async function saveTransaction() {
   showToast("Операция сохранена");
   await loadAll();
   switchTab("dashboard");
+}
+
+async function loadHistory() {
+  if (!state.telegramId) return;
+  const params = new URLSearchParams();
+  const from = qs("#history-from").value;
+  const to = qs("#history-to").value;
+  const category = qs("#history-category").value;
+  const scope = qs("#history-scope").value;
+  const txType = qs("#history-type").value;
+  if (from) params.set("date_from", new Date(`${from}T00:00:00`).toISOString());
+  if (to) params.set("date_to", new Date(`${to}T23:59:59`).toISOString());
+  if (category) params.set("category", category);
+  if (scope) params.set("scope", scope);
+  if (txType) params.set("tx_type", txType);
+  const data = await api(`/miniapp/transactions/${state.telegramId}?${params.toString()}`);
+  state.history = data.items || [];
+  qs("#history-income").textContent = money(data.summary.income);
+  qs("#history-expense").textContent = money(data.summary.expense);
+  qs("#history-balance").textContent = money(data.summary.balance);
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = qs("#history-list");
+  if (!state.history.length) {
+    list.innerHTML = `<p class="muted">За выбранный период операций нет</p>`;
+    return;
+  }
+  let currentDay = "";
+  list.innerHTML = state.history
+    .map((tx) => {
+      const date = new Date(tx.date);
+      const day = date.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+      const header = day !== currentDay ? `<div class="history-day">${day}</div>` : "";
+      currentDay = day;
+      const isIncome = tx.type === "income";
+      const sign = isIncome ? "+" : "-";
+      const scope = tx.is_personal ? "Личное" : "Семейное";
+      const tag = tx.tag ? ` · #${tx.tag}` : "";
+      return `${header}<div class="history-item">
+        <div class="history-icon">${tx.emoji}</div>
+        <div class="history-main">
+          <div class="row-title"><strong>${tx.comment || tx.category}</strong><span class="${isIncome ? "income" : "expense"}">${sign}${money(tx.amount)}</span></div>
+          <div class="history-meta">${tx.category} · ${scope}${tag}</div>
+        </div>
+      </div>`;
+    })
+    .join("");
 }
 
 async function loadBudgetTemplate() {
