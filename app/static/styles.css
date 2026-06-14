@@ -740,6 +740,19 @@ select:focus {
   font-size: 12px;
 }
 
+.history-category-edit {
+  display: grid;
+  gap: 6px;
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.history-category-edit select {
+  min-height: 38px;
+  font-size: 13px;
+}
+
 .income {
   color: var(--green);
 }
