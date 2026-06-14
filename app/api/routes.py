@@ -18,7 +18,7 @@ from app.schemas.finance import (
     OperationCreate,
     TransactionCategoryUpdate,
 )
-from app.services.defaults import EXPENSE_CATEGORIES, INCOME_CATEGORIES
+from app.services.defaults import EXPENSE_CATEGORIES, INCOME_CATEGORIES, budget_plan_categories
 from app.services.family_service import ensure_user
 from app.services.analytics_service import AnalyticsService
 from app.services.finance_service import FinanceService
@@ -249,9 +249,7 @@ async def miniapp_budget_template(
         raise HTTPException(status_code=400, detail="Month must be YYYY-MM") from exc
     values = await finance.budget_template_values(session, user.family_id, target_month)
     items = []
-    for name, emoji, _keywords in EXPENSE_CATEGORIES:
-        if name == "Прочее":
-            continue
+    for name, emoji, _keywords in budget_plan_categories():
         items.append({"category": name, "emoji": emoji, "amount": str(values.get(name, 0))})
     return {"month": month, "items": items}
 
