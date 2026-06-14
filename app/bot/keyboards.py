@@ -3,10 +3,17 @@ from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 from app.core.config import settings
 
 
-def main_menu() -> ReplyKeyboardMarkup:
+def mini_app_url(telegram_id: int | None = None) -> str:
+    if not settings.public_app_url or telegram_id is None:
+        return settings.public_app_url
+    separator = "&" if "?" in settings.public_app_url else "?"
+    return f"{settings.public_app_url}{separator}telegram_id={telegram_id}"
+
+
+def main_menu(telegram_id: int | None = None) -> ReplyKeyboardMarkup:
     mini_app_button = KeyboardButton(
         text="🚀 Открыть Mini App",
-        web_app=WebAppInfo(url=settings.public_app_url) if settings.public_app_url else None,
+        web_app=WebAppInfo(url=mini_app_url(telegram_id)) if settings.public_app_url else None,
     )
     return ReplyKeyboardMarkup(
         keyboard=[
