@@ -476,6 +476,9 @@ async def add_operation(
     try:
         async with SessionLocal() as session:
             tx, alerts = await finance.add_from_text(session, user, text, default_type)
+            budget_status = None
+            if tx.type == TransactionType.expense:
+                budget_status = await finance.category_budget_status(session, user.family_id, tx.category_id, tx.date)
             family_users = list((await session.scalars(select(User).where(User.family_id == user.family_id))).all())
     except ValueError as exc:
         await message.answer(str(exc), reply_markup=main_menu(message.from_user.id))
@@ -484,11 +487,22 @@ async def add_operation(
     sign = "Доход" if tx.type == TransactionType.income else "Расход"
     scope = "личное" if tx.is_personal else "семейное"
     tag = f" · #{tx.tag.name}" if tx.tag else ""
+    budget_line = ""
+    if tx.type == TransactionType.expense:
+        if budget_status:
+            budget_line = (
+                f"\n\nБюджет категории: план {money(budget_status['limit'])}, "
+                f"потрачено {money(budget_status['spent'])}, "
+                f"остаток {money(budget_status['left'])}"
+            )
+        else:
+            budget_line = "\n\nЛимит по этой категории на месяц не задан."
     await message.answer(
         f"{sign} сохранен\n\n"
         f"{tx.category.emoji} {tx.category.name}: {money(tx.amount)}\n"
         f"{tx.comment} · {scope}{tag}\n"
-        f"Дата: {tx.date:%d.%m.%Y}",
+        f"Дата: {tx.date:%d.%m.%Y}"
+        f"{budget_line}",
         reply_markup=main_menu(message.from_user.id),
     )
     for alert in alerts:
