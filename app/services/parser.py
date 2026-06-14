@@ -37,7 +37,8 @@ def parse_operation(text: str, default_type: TransactionType) -> ParsedOperation
 
     tag_match = TAG_RE.search(clean)
     tag = tag_match.group("tag").lower() if tag_match else None
-    is_personal = any(word in clean.lower() for word in ("личное", "личный", "личная", "personal"))
+    has_family_scope = any(word in clean.lower() for word in ("семейное", "семейный", "семейная", "family"))
+    is_personal = not has_family_scope
 
     comment = AMOUNT_RE.sub("", clean_without_date, count=1)
     comment = TAG_RE.sub("", comment)
